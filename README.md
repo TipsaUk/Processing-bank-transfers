@@ -28,9 +28,3 @@ go run ./cmd/api
 ```bash
 curl http://localhost:8080/health
 ```
-
-## Тесты
-
-```bash
-go test ./...
-```
