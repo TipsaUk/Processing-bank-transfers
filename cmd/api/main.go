@@ -1,20 +1,18 @@
 package main
 
 import (
-	"log"
-	"net/http"
+	"Processing-bank-transfers/internal/config"
+	"Processing-bank-transfers/internal/db"
+	"Processing-bank-transfers/internal/server"
 )
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
 
-	const addr = ":8080"
-	log.Printf("API server is starting on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("server stopped: %v", err)
-	}
+	cfg := config.Load()
+
+	dataBase := db.InitDB(cfg.DBConnString())
+
+	srv := server.New(dataBase, cfg.ServerPort)
+	srv.Start()
+
 }
