@@ -1,54 +1,30 @@
 package inmemory
 
 import (
-	"context"
-	"errors"
-	"sync"
-
+	"database/sql"
 	"processing-bank-transfers/internal/model"
 )
 
-var ErrAccountNotFound = errors.New("account not found")
-
 type AccountRepository struct {
-	mu       sync.RWMutex
-	accounts map[string]model.BankAccount
+	db *sql.DB
 }
 
-func NewAccountRepository() *AccountRepository {
-	return &AccountRepository{accounts: make(map[string]model.BankAccount)}
+func NewAccountRepository(db *sql.DB) *AccountRepository {
+	return &AccountRepository{db: db}
 }
 
-func (r *AccountRepository) Create(_ context.Context, account model.BankAccount) (string, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.accounts[account.ID] = account
-	return account.ID, nil
+func (r *AccountRepository) CreateAccount(account model.BankAccount) error {
+	query := `INSERT INTO accounts (id, account_holder, balance, currency) VALUES ($1, $2, $3, $4)`
+	_, err := r.db.Exec(query, account.ID, account.AccountHolder, account.Balance, account.Currency)
+	return err
 }
 
-func (r *AccountRepository) GetByID(_ context.Context, accountID string) (model.BankAccount, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	account, ok := r.accounts[accountID]
-	if !ok {
-		return model.BankAccount{}, ErrAccountNotFound
+func (r *AccountRepository) GetBalance(id string) (float64, error) {
+	query := `SELECT balance FROM accounts WHERE id = $1`
+	var balance float64
+	err := r.db.QueryRow(query, id).Scan(balance)
+	if err != nil {
+		return 0, err
 	}
-
-	return account, nil
-}
-
-func (r *AccountRepository) UpdateBalance(_ context.Context, accountID string, newBalance float64) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	account, ok := r.accounts[accountID]
-	if !ok {
-		return ErrAccountNotFound
-	}
-
-	account.Balance = newBalance
-	r.accounts[accountID] = account
-	return nil
+	return balance, nil
 }

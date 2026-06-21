@@ -1,9 +1,9 @@
 package main
 
 import (
-	"Processing-bank-transfers/internal/config"
-	"Processing-bank-transfers/internal/db"
-	"Processing-bank-transfers/internal/server"
+	"processing-bank-transfers/internal/config"
+	"processing-bank-transfers/internal/db"
+	"processing-bank-transfers/internal/server"
 )
 
 func main() {

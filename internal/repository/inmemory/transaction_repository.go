@@ -1,39 +1,90 @@
 package inmemory
 
 import (
-	"context"
-	"sync"
+	"database/sql"
 
 	"processing-bank-transfers/internal/model"
 )
 
 type TransactionRepository struct {
-	mu           sync.RWMutex
-	transactions []model.Transaction
+	db *sql.DB
 }
 
-func NewTransactionRepository() *TransactionRepository {
-	return &TransactionRepository{transactions: make([]model.Transaction, 0)}
+func NewTransactionRepository(db *sql.DB) *TransactionRepository {
+	return &TransactionRepository{
+		db: db,
+	}
 }
 
-func (r *TransactionRepository) Create(_ context.Context, tx model.Transaction) (string, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *TransactionRepository) CreateTransaction(tx model.Transaction) error {
+	query := `
+		INSERT INTO transactions (
+			id,
+			from_account,
+			to_account,
+			amount,
+			status,
+			created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
 
-	r.transactions = append(r.transactions, tx)
-	return tx.ID, nil
+	_, err := r.db.Exec(
+		query,
+		tx.ID,
+		tx.FromAccount,
+		tx.ToAccount,
+		tx.Amount,
+		tx.Status,
+		tx.Timestamp,
+	)
+
+	return err
 }
 
-func (r *TransactionRepository) ListByAccountID(_ context.Context, accountID string) ([]model.Transaction, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *TransactionRepository) GetTransactionsByAccount(
+	accountID string,
+) ([]model.Transaction, error) {
 
-	result := make([]model.Transaction, 0)
-	for _, tx := range r.transactions {
-		if tx.FromAccount == accountID || tx.ToAccount == accountID {
-			result = append(result, tx)
+	query := `
+		SELECT
+			id,
+			from_account,
+			to_account,
+			amount,
+			created_at,
+			status
+		FROM transactions
+		WHERE from_account = $1
+		   OR to_account = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.Query(query, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []model.Transaction
+
+	for rows.Next() {
+		var tx model.Transaction
+
+		err := rows.Scan(
+			&tx.ID,
+			&tx.FromAccount,
+			&tx.ToAccount,
+			&tx.Amount,
+			&tx.Timestamp,
+			&tx.Status,
+		)
+		if err != nil {
+			return nil, err
 		}
+
+		transactions = append(transactions, tx)
 	}
 
-	return result, nil
+	return transactions, nil
 }

@@ -15,3 +15,9 @@ CREATE TABLE transactions (
                               created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                               processed_at TIMESTAMP
 );
+
+CREATE INDEX idx_accounts_currency ON accounts(currency);
+
+CREATE INDEX idx_transactions_from_account ON transactions(from_account);
+CREATE INDEX idx_transactions_to_account ON transactions(to_account);
+CREATE INDEX idx_transactions_status ON transactions(status);
