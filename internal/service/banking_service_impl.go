@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +22,7 @@ type BankingServiceImpl struct {
 	accounts     repository.AccountRepository
 	transactions repository.TransactionRepository
 	sequence     atomic.Uint64
+	transferMu   sync.Mutex
 }
 
 func NewBankingService(accounts repository.AccountRepository, transactions repository.TransactionRepository) *BankingServiceImpl {
@@ -63,6 +65,30 @@ func (s *BankingServiceImpl) Transfer(ctx context.Context, fromAccount, toAccoun
 		return TransferResult{}, ErrSourceEqualsTarget
 	}
 
+	resultCh := make(chan transferAsyncResult, 1)
+	go s.processTransfer(ctx, fromAccount, toAccount, amount, resultCh)
+
+	select {
+	case <-ctx.Done():
+		return TransferResult{}, ctx.Err()
+	case result := <-resultCh:
+		return result.transfer, result.err
+	}
+}
+
+func (s *BankingServiceImpl) processTransfer(ctx context.Context, fromAccount, toAccount string, amount float64, resultCh chan<- transferAsyncResult) {
+	transfer, err := s.executeTransfer(ctx, fromAccount, toAccount, amount)
+	resultCh <- transferAsyncResult{transfer: transfer, err: err}
+}
+
+func (s *BankingServiceImpl) executeTransfer(ctx context.Context, fromAccount, toAccount string, amount float64) (TransferResult, error) {
+	s.transferMu.Lock()
+	defer s.transferMu.Unlock()
+
+	if err := ctx.Err(); err != nil {
+		return TransferResult{}, err
+	}
+
 	from, err := s.accounts.GetByID(ctx, fromAccount)
 	if err != nil {
 		return TransferResult{}, err
@@ -99,6 +125,11 @@ func (s *BankingServiceImpl) Transfer(ctx context.Context, fromAccount, toAccoun
 	}
 
 	return TransferResult{TransactionID: txID, Status: tx.Status}, nil
+}
+
+type transferAsyncResult struct {
+	transfer TransferResult
+	err      error
 }
 
 func (s *BankingServiceImpl) GetTransactionHistory(ctx context.Context, accountID string) ([]model.Transaction, error) {
