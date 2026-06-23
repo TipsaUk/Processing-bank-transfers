@@ -16,7 +16,7 @@ func NewTransactionRepository(db *sql.DB) *TransactionRepository {
 	}
 }
 
-func (r *TransactionRepository) CreateTransaction(tx model.Transaction) error {
+func (r *TransactionRepository) Create(tx model.Transaction) error {
 	query := `
 		INSERT INTO transactions (
 			id,
